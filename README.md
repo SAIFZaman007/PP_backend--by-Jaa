@@ -43,6 +43,3 @@ uv run pytest
 uv run alembic revision --autogenerate -m "message"
 uv run alembic upgrade head
 ```
-
-See the root `README.md` for full configuration and deployment details, and `SECURITY.md`
-before going to production.
