@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Env & secrets  (NEVER commit these)
+.env
+*.env
+!.env.example
+google-service-account.json
+*.pem
+*.key
+
+# DB / local
+*.db
+*.sqlite3
+
+# OS
+.DS_Store
