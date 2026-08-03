@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -11,6 +12,7 @@ from app.api.routes import api_router
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.core.rate_limit import limiter
+from app.services.media_storage import media_storage
 
 logger = logging.getLogger("peak")
 
@@ -55,6 +57,9 @@ app.add_middleware(
 
 # Routes
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+# Admin-uploaded media (service photos, testimonial avatars, page images).
+app.mount(settings.MEDIA_URL_PATH, StaticFiles(directory=settings.MEDIA_ROOT), name="media")
 
 
 @app.get("/health", tags=["meta"])

@@ -19,5 +19,9 @@ google-service-account.json
 *.db
 *.sqlite3
 
+# Admin-uploaded media (user-generated content, not source — back this
+# directory up separately, or better, move to S3/GCS for production)
+/media/
+
 # OS
 .DS_Store

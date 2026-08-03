@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 
+from app.db.seed_content import seed_content
 from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
@@ -18,8 +19,11 @@ logger = logging.getLogger("peak.seed")
 
 PLANS = [
     {
-        "slug": "starter", "name": "Starter", "tagline": "Kickstart your journey",
-        "price_cents": 4900, "interval": BillingInterval.month, "sort_order": 1,
+        # One-time, not recurring: it's a single $49 strategy session, not
+        # a subscription — billing this monthly would silently keep
+        # charging clients for a consult they only ever had once.
+        "slug": "starter", "name": "Starter", "tagline": "One-time consultation",
+        "price_cents": 4900, "interval": BillingInterval.one_time, "sort_order": 1,
         "features": ["60-min strategy session", "Goal assessment & roadmap",
                      "Sample workout template", "Nutrition guidelines", "7-day support"],
     },
@@ -35,8 +39,9 @@ PLANS = [
         "slug": "elite", "name": "Elite", "tagline": "The complete experience",
         "price_cents": 19900, "interval": BillingInterval.month, "sort_order": 3,
         "features": ["Everything in Peak", "4 live training sessions/mo",
-                     "In-person OR virtual", "Supplement guidance",
-                     "Monthly body analysis", "Campus lifestyle planning"],
+                     "In-person OR virtual", "Priority response (<1hr)",
+                     "Supplement guidance", "Monthly body analysis",
+                     "Campus lifestyle planning"],
     },
 ]
 
@@ -116,7 +121,7 @@ async def seed() -> None:
                 )
             )
             logger.info("Seeded demo client (demo@peakphysique.com / peak2025)")
-
+        await seed_content(db)
         await db.commit()
     logger.info("Seed complete.")
 

@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     SMTP_STARTTLS: bool = True
     TRAINER_NOTIFY_EMAIL: str = "trainer@trainpeakphysique.com"
 
+    # AI chat assistant (server-side only — key never reaches the browser,
+    # unlike the client's original static-HTML demo which put the Groq key
+    # directly in browser JS. Same provider, safer architecture.)
+    AI_CHAT_ENABLED: bool = False
+    AI_CHAT_PROVIDER: str = "groq"  # "groq" | "anthropic"
+    AI_CHAT_API_KEY: str = ""
+    AI_CHAT_MODEL: str = "llama-3.3-70b-versatile"
+
     # Stripe
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
@@ -48,6 +56,12 @@ class Settings(BaseSettings):
     GOOGLE_CALENDAR_ENABLED: bool = False
     GOOGLE_SERVICE_ACCOUNT_FILE: str = "./google-service-account.json"
     GOOGLE_CALENDAR_ID: str = "primary"
+
+    # --- Media / admin image uploads ---------------------------------------
+    MEDIA_ROOT: str = "./media"
+    MEDIA_URL_PATH: str = "/media"
+    MAX_UPLOAD_MB: int = 5
+    PUBLIC_BASE_URL: str = ""
 
     # Seed / first trainer
     FIRST_TRAINER_EMAIL: EmailStr = "trainer@trainpeakphysique.com"

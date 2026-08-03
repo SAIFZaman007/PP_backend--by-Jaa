@@ -1,3 +1,4 @@
+from app.models.content import Service, SiteContent, Testimonial
 from app.models.booking import Booking, BookingStatus
 from app.models.message import Message
 from app.models.payment import Payment, PaymentStatus, PaymentType
@@ -8,4 +9,5 @@ from app.models.user import User, UserRole
 __all__ = [
     "User", "UserRole", "Booking", "BookingStatus", "Payment", "PaymentStatus",
     "PaymentType", "Plan", "BillingInterval", "ProgressEntry", "Message",
+    "Service", "Testimonial", "SiteContent",
 ]
