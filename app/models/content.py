@@ -21,12 +21,19 @@ class Service(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     icon: Mapped[str] = mapped_column(String(40), default="Dumbbell")  # lucide-react icon name
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    price_label: Mapped[str] = mapped_column(String(40), nullable=False)  # e.g. "$49"
+    price_label: Mapped[str] = mapped_column(String(40), nullable=False)  # e.g. "$49" (display only)
     price_suffix: Mapped[str] = mapped_column(String(30), default="starting")  # "/ starting", "/ mo"
+    # Authoritative amount charged at checkout — kept separate from the
+    # display strings above so "starting at $149" copy doesn't have to be
+    # perfectly parseable; the admin sets both explicitly.
+    price_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     image_url: Mapped[str | None] = mapped_column(String(500))
     is_featured: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Whether this service can be bought directly (Buy Now / Add to Cart).
+    # Some services (e.g. a custom bundle) might be booking-only.
+    is_purchasable: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
 

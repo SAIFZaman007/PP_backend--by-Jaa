@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import AdminUser, DbSession, StaffUser
 from app.models.booking import Booking, BookingStatus
@@ -111,5 +112,10 @@ async def admin_update_user(
 @router.get("/payments", response_model=list[PaymentPublic])
 async def all_payments(_staff: StaffUser, db: DbSession) -> list[Payment]:
     return list(
-        await db.scalars(select(Payment).order_by(Payment.created_at.desc()).limit(200))
+        await db.scalars(
+            select(Payment)
+            .options(selectinload(Payment.items))
+            .order_by(Payment.created_at.desc(), Payment.id.desc())
+            .limit(200)
+        )
     )

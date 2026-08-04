@@ -24,6 +24,7 @@ class PaymentType(str, enum.Enum):
     session = "session"
     subscription = "subscription"
     one_time = "one_time"
+    cart = "cart"  # multi-item checkout (services and/or plans bought together)
 
 
 class Payment(Base, TimestampMixin):
@@ -50,3 +51,41 @@ class Payment(Base, TimestampMixin):
     stripe_payment_intent_id: Mapped[str | None] = mapped_column(String(200))
 
     user: Mapped[User | None] = relationship(back_populates="payments")
+    items: Mapped[list[PaymentItem]] = relationship(
+        back_populates="payment", cascade="all, delete-orphan", order_by="PaymentItem.id"
+    )
+
+
+class PaymentItemType(str, enum.Enum):
+    service = "service"
+    plan = "plan"
+
+
+class PaymentItem(Base, TimestampMixin):
+    """One line of a checkout — a specific service or plan, snapshotted at
+    purchase time so the receipt stays accurate even if the admin later
+    renames or re-prices the underlying Service/Plan."""
+
+    __tablename__ = "payment_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    payment_id: Mapped[int] = mapped_column(
+        ForeignKey("payments.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    item_type: Mapped[PaymentItemType] = mapped_column(
+        Enum(PaymentItemType, name="payment_item_type"), nullable=False
+    )
+    # Nullable on purpose: keeps the line item (and the receipt) intact even
+    # if the referenced Service/Plan is deleted later.
+    service_id: Mapped[int | None] = mapped_column(
+        ForeignKey("services.id", ondelete="SET NULL"), index=True
+    )
+    plan_id: Mapped[int | None] = mapped_column(
+        ForeignKey("plans.id", ondelete="SET NULL"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(160), nullable=False)  # snapshot
+    unit_price_cents: Mapped[int] = mapped_column(Integer, nullable=False)  # snapshot
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    subtotal_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    payment: Mapped[Payment] = relationship(back_populates="items")

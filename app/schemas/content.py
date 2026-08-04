@@ -10,9 +10,11 @@ class ServicePublic(BaseModel):
     name: str
     price_label: str
     price_suffix: str
+    price_cents: int
     description: str
     image_url: str | None
     is_featured: bool
+    is_purchasable: bool
     sort_order: int
 
 
@@ -21,10 +23,12 @@ class ServiceCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     price_label: str = Field(min_length=1, max_length=40)
     price_suffix: str = Field(default="starting", max_length=30)
+    price_cents: int = Field(default=0, ge=0)
     description: str = Field(min_length=1)
     image_url: str | None = None
     is_featured: bool = False
     is_active: bool = True
+    is_purchasable: bool = True
     sort_order: int = 0
 
 
@@ -33,10 +37,12 @@ class ServiceUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=120)
     price_label: str | None = Field(default=None, max_length=40)
     price_suffix: str | None = Field(default=None, max_length=30)
+    price_cents: int | None = Field(default=None, ge=0)
     description: str | None = None
     image_url: str | None = None
     is_featured: bool | None = None
     is_active: bool | None = None
+    is_purchasable: bool | None = None
     sort_order: int | None = None
 
 
