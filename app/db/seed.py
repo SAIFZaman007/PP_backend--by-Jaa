@@ -341,7 +341,7 @@ def _print_credentials_summary() -> None:
     Runs every time seed() finishes, whether accounts were just created
     or already existed, since "how do I log in" is useful on every run.
     """
-    default_admin_password = settings.FIRST_TRAINER_PASSWORD == "change-me-strong-password"
+    default_admin_password = settings.FIRST_TRAINER_PASSWORD == "Tr@iner__123!"
 
     lines = [
         "",
