@@ -17,6 +17,13 @@ from fastapi import Depends
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 logger = logging.getLogger("peak.bookings")
 
+# Bookings with no start_time yet (auto-created from a paid checkout line
+# item — see payments.py) are the ones most needing action, so they always
+# sort first; everything else falls back to most-recent-first. Written as
+# an explicit boolean-then-date sort rather than relying on NULLS FIRST/LAST
+# because SQLite (dev) and Postgres (prod) default that the opposite way.
+_BOOKING_ORDER = (Booking.start_time.is_(None).desc(), Booking.start_time.desc())
+
 
 async def _process_new_booking(booking_id: int) -> None:
     """Runs after the response: sync to Google Calendar, then email everyone.
@@ -67,7 +74,9 @@ async def create_booking(
 @router.get("/me", response_model=list[BookingPublic])
 async def my_bookings(user: CurrentUser, db: DbSession) -> list[Booking]:
     rows = await db.scalars(
-        select(Booking).where(Booking.client_id == user.id).order_by(Booking.start_time.desc())
+        select(Booking)
+        .where(Booking.client_id == user.id)
+        .order_by(*_BOOKING_ORDER)
     )
     return list(rows)
 
@@ -78,7 +87,7 @@ async def list_bookings(
     db: DbSession,
     status_filter: BookingStatus | None = Query(default=None, alias="status"),
 ) -> list[Booking]:
-    stmt = select(Booking).order_by(Booking.start_time.desc())
+    stmt = select(Booking).order_by(*_BOOKING_ORDER)
     if status_filter:
         stmt = stmt.where(Booking.status == status_filter)
     return list(await db.scalars(stmt))

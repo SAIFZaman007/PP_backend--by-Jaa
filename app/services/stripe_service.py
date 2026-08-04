@@ -23,11 +23,39 @@ def is_enabled() -> bool:
     return _stripe is not None
 
 
+def stripe_get(obj, key: str, default=None):
+    """Safely read a field off anything the Stripe SDK hands back.
+
+    Stripe's Python SDK (v15+) represents API responses with its own
+    `StripeObject` — it supports `obj["key"]` and `obj.key`, but it does
+    *not* implement dict's `.get()`, so `session.get("metadata")` raises
+    `AttributeError: get` instead of returning None (this is what was
+    breaking payment confirmation). This helper reads the value the safe
+    way for a StripeObject, a plain dict (e.g. webhook payloads some SDK
+    versions deserialize differently), or anything missing/None — so call
+    sites never need to know or care which shape they were handed.
+    """
+    if obj is None:
+        return default
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    try:
+        return obj[key]
+    except (KeyError, TypeError):
+        return default
+
+
 @dataclass
 class LineItem:
     name: str
     unit_amount_cents: int
     quantity: int = 1
+
+
+@dataclass
+class CheckoutSession:
+    url: str
+    session_id: str
 
 
 def create_checkout_session(
@@ -38,10 +66,10 @@ def create_checkout_session(
     success_path: str = "/portal/payments?status=success",
     cancel_path: str = "/portal/payments?status=cancelled",
     metadata: dict | None = None,
-) -> str | None:
+) -> CheckoutSession | None:
     """Create a Stripe Checkout session from one or more line items and
-    return its URL (or None if disabled). A single-item cart is just a
-    list of length one — same code path either way."""
+    return its URL + session id (or None if disabled). A single-item cart
+    is just a list of length one — same code path either way."""
     if _stripe is None:
         logger.warning("Stripe disabled — returning no checkout URL.")
         return None
@@ -64,7 +92,23 @@ def create_checkout_session(
         cancel_url=f"{settings.FRONTEND_URL}{cancel_path}",
         metadata=metadata or {},
     )
-    return session.url
+    return CheckoutSession(url=session.url, session_id=session.id)
+
+
+def retrieve_checkout_session(session_id: str):
+    """Pull a checkout session's current state straight from Stripe's API.
+
+    This is what lets a payment get marked "succeeded" the instant the
+    customer lands back on the success page — it doesn't depend on Stripe
+    being able to reach this server with a webhook call, which local dev
+    (no `stripe listen` running) and some restrictive networks never
+    satisfy. The webhook below stays in place as the durable, async
+    source of truth for production; this is the same-second, no-extra-
+    setup path that makes the UI correct immediately either way.
+    """
+    if _stripe is None:
+        raise RuntimeError("Stripe is not configured")
+    return _stripe.checkout.Session.retrieve(session_id)
 
 
 def construct_webhook_event(payload: bytes, signature: str):

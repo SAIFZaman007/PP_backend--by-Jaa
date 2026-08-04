@@ -30,8 +30,12 @@ class BookingPublic(BaseModel):
     phone: str | None
     goal: str | None
     service: str
-    start_time: datetime
+    # Null means "purchased but not yet scheduled" — see Booking.start_time.
+    start_time: datetime | None
     status: BookingStatus
     notes: str | None
     google_event_id: str | None
+    # Present when this booking was auto-created from a checkout line item
+    # rather than the public booking form.
+    payment_item_id: int | None
     created_at: datetime

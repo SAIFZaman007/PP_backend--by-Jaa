@@ -11,6 +11,12 @@ Idempotent throughout: every block checks for existing rows first, so
 re-running this after the app has real data is always safe — it only
 ever fills in gaps, never overwrites or duplicates.
 
+Always seeds (or confirms) one Head Coach / Super Admin account from the
+FIRST_TRAINER_* settings, with role=admin — the account with full access
+to the Coach Console. Every login this script is responsible for is
+printed to the terminal at the end of a run; see
+_print_credentials_summary().
+
 Run with: python -m app.db.seed
 """
 import asyncio
@@ -256,7 +262,7 @@ async def _seed_staff(db) -> None:
             last_name=name_parts[1] if len(name_parts) > 1 else "",
             role=UserRole.admin,
         ))
-        logger.info("Seeded first trainer/admin: %s", settings.FIRST_TRAINER_EMAIL)
+        logger.info("Seeded Head Coach / Super Admin: %s", settings.FIRST_TRAINER_EMAIL)
 
     for staff in EXTRA_STAFF:
         existing = await db.scalar(select(User).where(User.email == staff["email"]))
@@ -321,7 +327,57 @@ async def _seed_demo_clients(db) -> None:
             type=PaymentType.subscription,
             status=PaymentStatus.succeeded,
         ))
-        logger.info("Seeded demo client with history: %s (%s / %s)", c["email"], c["email"], c["password"])
+        logger.info("Seeded demo client with history: %s", c["email"])
+
+
+def _print_credentials_summary() -> None:
+    """Print every seeded login to the terminal so a fresh install (or
+    anyone re-running this script) can sign in immediately without
+    digging through .env or source. Printed with plain print() rather
+    than logger.info() on purpose — this is a one-time interactive
+    readout for the person running the command, not something that
+    should end up duplicated into structured app logs/log aggregation.
+
+    Runs every time seed() finishes, whether accounts were just created
+    or already existed, since "how do I log in" is useful on every run.
+    """
+    default_admin_password = settings.FIRST_TRAINER_PASSWORD == "change-me-strong-password"
+
+    lines = [
+        "",
+        "=" * 62,
+        "  PEAK PHYSIQUE — SEEDED LOGIN CREDENTIALS",
+        "=" * 62,
+        "",
+        "  Head Coach / Super Admin  (Coach Console — full access)",
+        f"    Name:     {settings.FIRST_TRAINER_NAME}",
+        f"    Email:    {settings.FIRST_TRAINER_EMAIL}",
+        f"    Password: {settings.FIRST_TRAINER_PASSWORD}",
+    ]
+    if default_admin_password:
+        lines.append(
+            "    \u26a0  Still the default password — set FIRST_TRAINER_PASSWORD"
+            " in .env before deploying."
+        )
+    lines.append("")
+
+    if EXTRA_STAFF:
+        lines.append("  Additional staff  (Coach Console)")
+        for staff in EXTRA_STAFF:
+            lines.append(
+                f"    {staff['role'].value.capitalize():<9} {staff['email']}  /  {staff['password']}"
+            )
+        lines.append("")
+
+    if DEMO_CLIENTS:
+        lines.append("  Demo clients  (client portal — /login)")
+        for c in DEMO_CLIENTS:
+            lines.append(f"    {c['email']}  /  {c['password']}")
+        lines.append("")
+
+    lines.append("=" * 62)
+    lines.append("")
+    print("\n".join(lines))
 
 
 async def seed() -> None:
@@ -332,6 +388,7 @@ async def seed() -> None:
         await _seed_content(db)
         await db.commit()
     logger.info("Seed complete.")
+    _print_credentials_summary()
 
 
 if __name__ == "__main__":

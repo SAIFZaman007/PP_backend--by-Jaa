@@ -38,7 +38,13 @@ class Booking(Base, TimestampMixin):
     goal: Mapped[str | None] = mapped_column(String(120))
 
     service: Mapped[str] = mapped_column(String(120), default="Free Intro Call", nullable=False)
-    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Nullable on purpose: a session bought through checkout (see
+    # payments.py) becomes a booking the instant payment succeeds, but no
+    # time slot exists yet — the coach sets one from the dashboard. The
+    # public booking form still always supplies a real time (see
+    # BookingCreate), so this only ever reads as null for that
+    # "awaiting scheduling" case.
+    start_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[BookingStatus] = mapped_column(
         Enum(BookingStatus, name="booking_status"),
         default=BookingStatus.pending,
@@ -49,6 +55,13 @@ class Booking(Base, TimestampMixin):
 
     # Google Calendar event id once synced.
     google_event_id: Mapped[str | None] = mapped_column(String(200))
+
+    # Set only for bookings auto-created from a paid checkout line item —
+    # lets the coach trace "why does this booking exist" back to the
+    # purchase, and keeps that creation idempotent (see payments.py).
+    payment_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("payment_items.id", ondelete="SET NULL"), index=True
+    )
 
     client: Mapped[User | None] = relationship(
         back_populates="bookings", foreign_keys=[client_id]
