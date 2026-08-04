@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from app.models.user import UserRole
 
 
 class MessageCreate(BaseModel):
@@ -16,3 +18,21 @@ class MessagePublic(BaseModel):
     body: str
     is_read: bool
     created_at: datetime
+
+
+# ── Conversations (inbox view — who's messaged whom) ───────────────────
+
+
+class ConversationPartner(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    first_name: str
+    last_name: str
+    email: EmailStr
+    role: UserRole
+
+
+class ConversationPublic(BaseModel):
+    user: ConversationPartner
+    last_message: MessagePublic
+    unread_count: int
