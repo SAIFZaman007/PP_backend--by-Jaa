@@ -203,7 +203,7 @@ SITE_CONTENT = {
 
 EXTRA_STAFF = [
     {
-        "email": "coach@trainpeakphysique.com", "password": "change-me-strong-password",
+        "email": "coach@trainpeakphysique.com", "password": "c04ch__123!",
         "first_name": "Jordan", "last_name": "Ade", "role": UserRole.trainer,
     },
 ]
