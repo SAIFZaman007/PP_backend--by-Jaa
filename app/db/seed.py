@@ -1,23 +1,5 @@
 """
-Single idempotent database seed — pricing plans, services, testimonials,
-site copy, staff/admin accounts, and demo clients.
-
-This used to be split across seed.py + seed_content.py; merged into one
-file because they always ran together anyway (seed_content() was only
-ever called from here) and keeping "what does a fresh DB look like" in
-one place is easier to review and keep in sync.
-
-Idempotent throughout: every block checks for existing rows first, so
-re-running this after the app has real data is always safe — it only
-ever fills in gaps, never overwrites or duplicates.
-
-Always seeds (or confirms) one Head Coach / Super Admin account from the
-FIRST_TRAINER_* settings, with role=admin — the account with full access
-to the Coach Console. Every login this script is responsible for is
-printed to the terminal at the end of a run; see
-_print_credentials_summary().
-
-Run with: python -m app.db.seed
+Seed the database with initial data for development and testing. Run with: python -m app.db.seed
 """
 import asyncio
 import logging
@@ -73,7 +55,7 @@ SERVICES = [
     {"icon": "Video", "name": "Online Consultation", "price_label": "$49", "price_suffix": "session",
      "price_cents": 4900,
      "description": "A deep-dive strategy session to assess your goals, current fitness level, lifestyle, and build your roadmap to results.",
-     "image_url": "https://res.cloudinary.com/e4hsg7br/image/upload/v1785935720/Picture2_ya5fov.jpg",
+     "image_url": "https://images.unsplash.com/photo-1553877522-43269d4ea984?w=800&q=80&auto=format&fit=crop",
      "sort_order": 1},
     {"icon": "Apple", "name": "Nutrition Counseling", "price_label": "$79", "price_suffix": "month",
      "price_cents": 7900,
@@ -83,7 +65,7 @@ SERVICES = [
     {"icon": "Dumbbell", "name": "1-on-1 Coaching", "price_label": "$149", "price_suffix": "starting",
      "price_cents": 14900,
      "description": "Fully custom programming with weekly check-ins and unlimited messaging.",
-     "image_url": "https://res.cloudinary.com/e4hsg7br/image/upload/v1785935894/Picture4_xwky02.jpg",
+     "image_url": "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=800&q=80&auto=format&fit=crop",
      "sort_order": 3, "is_featured": True},
     {"icon": "Users", "name": "In-Person Training", "price_label": "$99", "price_suffix": "starting",
      "price_cents": 9900,
@@ -93,12 +75,12 @@ SERVICES = [
     {"icon": "MonitorSmartphone", "name": "Virtual Training", "price_label": "$89", "price_suffix": "starting",
      "price_cents": 8900,
      "description": "Live-guided remote sessions from anywhere, on your schedule.",
-     "image_url": "https://res.cloudinary.com/e4hsg7br/image/upload/v1785935826/Picture3_dskqc0.jpg",
+     "image_url": "https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?w=800&q=80&auto=format&fit=crop",
      "sort_order": 5},
     {"icon": "Package", "name": "All-in-One Bundle", "price_label": "$199", "price_suffix": "starting",
      "price_cents": 19900,
      "description": "Training, nutrition and check-ins combined for the complete experience.",
-     "image_url": "https://res.cloudinary.com/e4hsg7br/image/upload/v1785935935/Picture5_sakljf.jpg",
+     "image_url": "https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=800&q=80&auto=format&fit=crop",
      "sort_order": 6},
 ]
 
@@ -152,7 +134,7 @@ SITE_CONTENT = {
             "ambitions. Every program is NASM-certified, science-driven, and built "
             "with intention."
         ),
-        "image_url": "https://res.cloudinary.com/e4hsg7br/image/upload/v1785935465/Picture1_ykeldl.jpg",
+        "image_url": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=85&auto=format&fit=crop",
         "image_caption": "Science-Based Training",
         "stats": [
             {"num": "100%", "label": "Science-Based"},
@@ -197,9 +179,12 @@ SITE_CONTENT = {
 }
 
 # ── Staff & demo client accounts ───────────────────────────────────────
-# FIRST_TRAINER_* (from settings) always seeds as the primary admin.
-# These two are additional accounts purely so a fresh install has more
-# than one login to test role-based access with.
+# FIRST_TRAINER_* (from settings) always seeds as the primary admin, in
+# every environment. EXTRA_STAFF and DEMO_CLIENTS below are additional
+# accounts with fixed, publicly-visible-in-source passwords, purely so a
+# fresh dev/staging install has more than one login to test role-based
+# access with — _seed_staff() and seed() skip both whenever
+# ENVIRONMENT=production, so they never end up in a live database.
 
 EXTRA_STAFF = [
     {
@@ -263,6 +248,13 @@ async def _seed_staff(db) -> None:
             role=UserRole.admin,
         ))
         logger.info("Seeded Head Coach / Super Admin: %s", settings.FIRST_TRAINER_EMAIL)
+
+    # EXTRA_STAFF is a fixed-password demo trainer account, purely so a
+    # fresh dev/staging install has a second role to test against. It must
+    # never land in a live database — gated on ENVIRONMENT the same way as
+    # _seed_demo_clients below.
+    if settings.is_production:
+        return
 
     for staff in EXTRA_STAFF:
         existing = await db.scalar(select(User).where(User.email == staff["email"]))
@@ -341,7 +333,10 @@ def _print_credentials_summary() -> None:
     Runs every time seed() finishes, whether accounts were just created
     or already existed, since "how do I log in" is useful on every run.
     """
-    default_admin_password = settings.FIRST_TRAINER_PASSWORD == "Tr@iner__123!"
+    # FIRST_TRAINER_PASSWORD has no hardcoded default anymore (see
+    # app/core/config.py), so there's nothing fixed left to compare
+    # against — just flag it if it's short enough to be easily guessed.
+    weak_admin_password = len(settings.FIRST_TRAINER_PASSWORD) < 12
 
     lines = [
         "",
@@ -354,14 +349,14 @@ def _print_credentials_summary() -> None:
         f"    Email:    {settings.FIRST_TRAINER_EMAIL}",
         f"    Password: {settings.FIRST_TRAINER_PASSWORD}",
     ]
-    if default_admin_password:
+    if weak_admin_password:
         lines.append(
-            "    \u26a0  Still the default password — set FIRST_TRAINER_PASSWORD"
-            " in .env before deploying."
+            "    \u26a0  FIRST_TRAINER_PASSWORD is short — use a longer,"
+            " unique password in .env before deploying."
         )
     lines.append("")
 
-    if EXTRA_STAFF:
+    if EXTRA_STAFF and not settings.is_production:
         lines.append("  Additional staff  (Coach Console)")
         for staff in EXTRA_STAFF:
             lines.append(
@@ -369,7 +364,7 @@ def _print_credentials_summary() -> None:
             )
         lines.append("")
 
-    if DEMO_CLIENTS:
+    if DEMO_CLIENTS and not settings.is_production:
         lines.append("  Demo clients  (client portal — /login)")
         for c in DEMO_CLIENTS:
             lines.append(f"    {c['email']}  /  {c['password']}")
@@ -384,7 +379,14 @@ async def seed() -> None:
     async with AsyncSessionLocal() as db:
         await _seed_plans(db)
         await _seed_staff(db)
-        await _seed_demo_clients(db)
+        # Demo clients (fixed "peak2025" password, fabricated progress
+        # history) exist to make a fresh dev/staging install immediately
+        # explorable. Skipped in production — a live client-facing DB
+        # should only ever contain the real admin account seeded above.
+        if settings.is_production:
+            logger.info("ENVIRONMENT=production — skipping demo staff/client accounts")
+        else:
+            await _seed_demo_clients(db)
         await _seed_content(db)
         await db.commit()
     logger.info("Seed complete.")

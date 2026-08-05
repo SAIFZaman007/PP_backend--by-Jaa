@@ -1,7 +1,9 @@
-"""Central application settings, loaded from environment / .env."""
+"""
+Central application settings, loaded from environment / .env.
+"""
 from functools import lru_cache
 
-from pydantic import EmailStr, field_validator
+from pydantic import EmailStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,7 +16,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Peak Physique API"
     API_V1_PREFIX: str = "/api/v1"
     ENVIRONMENT: str = "development"
-    SECRET_KEY: str = "dev-insecure-secret-change-me-in-production-0123456789"
+    SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -39,9 +41,6 @@ class Settings(BaseSettings):
     SMTP_STARTTLS: bool = True
     TRAINER_NOTIFY_EMAIL: str = "trainer@trainpeakphysique.com"
 
-    # AI chat assistant (server-side only — key never reaches the browser,
-    # unlike the client's original static-HTML demo which put the Groq key
-    # directly in browser JS. Same provider, safer architecture.)
     AI_CHAT_ENABLED: bool = False
     AI_CHAT_PROVIDER: str = "groq"  # "groq" | "anthropic"
     AI_CHAT_API_KEY: str = ""
@@ -63,12 +62,28 @@ class Settings(BaseSettings):
     MAX_UPLOAD_MB: int = 5
     PUBLIC_BASE_URL: str = ""
 
+    # Seed / first trainer.
+    FIRST_TRAINER_EMAIL: EmailStr
+    FIRST_TRAINER_PASSWORD: str
+    FIRST_TRAINER_NAME: str
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def _split_origins(cls, v):
         if isinstance(v, str):
             return [o.strip() for o in v.split(",") if o.strip()]
         return v
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> "Settings":
+        """Fail fast at startup — not deep inside a request or the seed
+        script — if production is about to run with an unsafe secret."""
+        if self.is_production and len(self.SECRET_KEY) < 32:
+            raise ValueError(
+                "SECRET_KEY must be at least 32 characters when ENVIRONMENT=production. "
+                "Generate one with `openssl rand -hex 32` and set it in your env vars."
+            )
+        return self
 
     @property
     def is_production(self) -> bool:
