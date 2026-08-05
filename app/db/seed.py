@@ -152,7 +152,7 @@ SITE_CONTENT = {
             "ambitions. Every program is NASM-certified, science-driven, and built "
             "with intention."
         ),
-        "image_url": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=85&auto=format&fit=crop",
+        "image_url": "https://res.cloudinary.com/e4hsg7br/image/upload/v1785935465/Picture1_ykeldl.jpg",
         "image_caption": "Science-Based Training",
         "stats": [
             {"num": "100%", "label": "Science-Based"},
