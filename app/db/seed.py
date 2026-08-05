@@ -55,7 +55,7 @@ SERVICES = [
     {"icon": "Video", "name": "Online Consultation", "price_label": "$49", "price_suffix": "session",
      "price_cents": 4900,
      "description": "A deep-dive strategy session to assess your goals, current fitness level, lifestyle, and build your roadmap to results.",
-     "image_url": "https://images.unsplash.com/photo-1553877522-43269d4ea984?w=800&q=80&auto=format&fit=crop",
+     "image_url": "https://res.cloudinary.com/e4hsg7br/image/upload/v1785935720/Picture2_ya5fov.jpg",
      "sort_order": 1},
     {"icon": "Apple", "name": "Nutrition Counseling", "price_label": "$79", "price_suffix": "month",
      "price_cents": 7900,
@@ -65,7 +65,7 @@ SERVICES = [
     {"icon": "Dumbbell", "name": "1-on-1 Coaching", "price_label": "$149", "price_suffix": "starting",
      "price_cents": 14900,
      "description": "Fully custom programming with weekly check-ins and unlimited messaging.",
-     "image_url": "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=800&q=80&auto=format&fit=crop",
+     "image_url": "https://res.cloudinary.com/e4hsg7br/image/upload/v1785935894/Picture4_xwky02.jpg",
      "sort_order": 3, "is_featured": True},
     {"icon": "Users", "name": "In-Person Training", "price_label": "$99", "price_suffix": "starting",
      "price_cents": 9900,
@@ -75,12 +75,12 @@ SERVICES = [
     {"icon": "MonitorSmartphone", "name": "Virtual Training", "price_label": "$89", "price_suffix": "starting",
      "price_cents": 8900,
      "description": "Live-guided remote sessions from anywhere, on your schedule.",
-     "image_url": "https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?w=800&q=80&auto=format&fit=crop",
+     "image_url": "https://res.cloudinary.com/e4hsg7br/image/upload/v1785935826/Picture3_dskqc0.jpg",
      "sort_order": 5},
     {"icon": "Package", "name": "All-in-One Bundle", "price_label": "$199", "price_suffix": "starting",
      "price_cents": 19900,
      "description": "Training, nutrition and check-ins combined for the complete experience.",
-     "image_url": "https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=800&q=80&auto=format&fit=crop",
+     "image_url": "https://res.cloudinary.com/e4hsg7br/image/upload/v1785935935/Picture5_sakljf.jpg",
      "sort_order": 6},
 ]
 
@@ -134,7 +134,7 @@ SITE_CONTENT = {
             "ambitions. Every program is NASM-certified, science-driven, and built "
             "with intention."
         ),
-        "image_url": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=85&auto=format&fit=crop",
+        "image_url": "https://res.cloudinary.com/e4hsg7br/image/upload/v1785935465/Picture1_ykeldl.jpg",
         "image_caption": "Science-Based Training",
         "stats": [
             {"num": "100%", "label": "Science-Based"},

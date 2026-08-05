@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -15,6 +16,36 @@ from app.core.rate_limit import limiter
 from app.services.media_storage import media_storage
 
 logger = logging.getLogger("peak")
+
+
+class UnhandledErrorMiddleware:
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        response_started = False
+
+        async def _send(message):
+            nonlocal response_started
+            if message["type"] == "http.response.start":
+                response_started = True
+            await send(message)
+
+        try:
+            await self.app(scope, receive, _send)
+        except Exception:
+            logger.exception("Unhandled error on %s %s", scope.get("method"), scope.get("path"))
+            if response_started:
+                # Response already partway sent — nothing safe to do but
+                # let the connection drop; re-sending would corrupt it.
+                raise
+            response = JSONResponse(status_code=500, content={"detail": "Internal server error"})
+            await response(scope, receive, send)
 
 
 @asynccontextmanager
@@ -45,6 +76,7 @@ app = FastAPI(
 # Rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(UnhandledErrorMiddleware)
 
 # CORS
 app.add_middleware(
