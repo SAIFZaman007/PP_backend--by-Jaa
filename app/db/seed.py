@@ -1,5 +1,5 @@
 """
-Seed the database with initial data for development and testing. Run with: python -m app.db.seed
+Run with: python -m app.db.seed
 """
 import asyncio
 import logging
@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 from app.db.session import AsyncSessionLocal
 from app.models.booking import Booking, BookingStatus
 from app.models.content import Service, SiteContent, Testimonial
@@ -238,16 +238,44 @@ async def _seed_staff(db) -> None:
     trainer = await db.scalar(
         select(User).where(User.email == str(settings.FIRST_TRAINER_EMAIL).lower())
     )
+    name_parts = settings.FIRST_TRAINER_NAME.split(" ", 1)
+    first_name = name_parts[0]
+    last_name = name_parts[1] if len(name_parts) > 1 else ""
+
     if trainer is None:
-        name_parts = settings.FIRST_TRAINER_NAME.split(" ", 1)
         db.add(User(
             email=str(settings.FIRST_TRAINER_EMAIL).lower(),
             hashed_password=hash_password(settings.FIRST_TRAINER_PASSWORD),
-            first_name=name_parts[0],
-            last_name=name_parts[1] if len(name_parts) > 1 else "",
+            first_name=first_name,
+            last_name=last_name,
             role=UserRole.admin,
         ))
         logger.info("Seeded Head Coach / Super Admin: %s", settings.FIRST_TRAINER_EMAIL)
+    else:
+        # Reconcile, don't just skip. FIRST_TRAINER_* in .env is the
+        # single source of truth for this one account — if someone
+        # rotates FIRST_TRAINER_PASSWORD and redeploys, this is what
+        # makes the live row actually pick that up, instead of the old
+        # password quietly working forever because "a row already
+        # exists" short-circuited seeding. Only ever touches this one
+        # row, and only the fields that actually drifted.
+        changed = False
+        if not verify_password(settings.FIRST_TRAINER_PASSWORD, trainer.hashed_password):
+            trainer.hashed_password = hash_password(settings.FIRST_TRAINER_PASSWORD)
+            changed = True
+        if trainer.first_name != first_name or trainer.last_name != last_name:
+            trainer.first_name, trainer.last_name = first_name, last_name
+            changed = True
+        if trainer.role != UserRole.admin:
+            trainer.role = UserRole.admin
+            changed = True
+        if not trainer.is_active:
+            trainer.is_active = True
+            changed = True
+        if changed:
+            db.add(trainer)
+            logger.info("Reconciled Head Coach / Super Admin: %s (.env values applied)",
+                        settings.FIRST_TRAINER_EMAIL)
 
     # EXTRA_STAFF is a fixed-password demo trainer account, purely so a
     # fresh dev/staging install has a second role to test against. It must
@@ -267,6 +295,11 @@ async def _seed_staff(db) -> None:
                 role=staff["role"],
             ))
             logger.info("Seeded staff account: %s (%s)", staff["email"], staff["role"].value)
+        elif not verify_password(staff["password"], existing.hashed_password):
+            # Same reconciliation as the trainer above, for the same reason.
+            existing.hashed_password = hash_password(staff["password"])
+            db.add(existing)
+            logger.info("Reconciled staff account password: %s", staff["email"])
 
 
 async def _seed_demo_clients(db) -> None:
