@@ -63,11 +63,6 @@ class Settings(BaseSettings):
     MAX_UPLOAD_MB: int = 5
     PUBLIC_BASE_URL: str = ""
 
-    # Seed / first trainer
-    FIRST_TRAINER_EMAIL: EmailStr = "trainer@trainpeakphysique.com"
-    FIRST_TRAINER_PASSWORD: str = "change-me-strong-password"
-    FIRST_TRAINER_NAME: str = "Head Trainer"
-
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def _split_origins(cls, v):
