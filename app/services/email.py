@@ -61,6 +61,30 @@ def _wrap(title: str, body_html: str) -> str:
 </div>"""
 
 
+async def send_staff_invitation_email(
+    to: str, role: str, invite_url: str, invited_by_name: str | None = None
+) -> None:
+    """Sent when an Admin invites a new Trainer/Admin from the Role Matrix
+    page. The link carries a one-time token (see Invitation.token_hash) —
+    accepting it is what actually creates the account, so this email never
+    contains a password.
+    """
+    role_label = role.capitalize()
+    inviter = f" by {invited_by_name}" if invited_by_name else ""
+    html = _wrap(
+        "You're invited to Peak Physique",
+        f"<p style='color:#ccc;line-height:1.6'>You've been invited{inviter} to join the "
+        f"Peak Physique Coach Console as <b>{role_label}</b>.</p>"
+        f"<p style='margin-top:20px'><a href='{invite_url}' "
+        "style='background:#F5A623;color:#0A0A0A;padding:12px 24px;border-radius:4px;"
+        "text-decoration:none;font-weight:700;display:inline-block'>Accept Invitation</a></p>"
+        f"<p style='color:#666;font-size:12px;margin-top:20px;line-height:1.6'>"
+        f"This link expires in 7 days. If the button doesn't work, copy and paste this "
+        f"link into your browser:<br>{invite_url}</p>",
+    )
+    await send_email(to, "You're invited to join Peak Physique", html)
+
+
 async def send_welcome_email(to: str, first_name: str) -> None:
     html = _wrap(
         f"Welcome, {first_name}!",
@@ -71,8 +95,19 @@ async def send_welcome_email(to: str, first_name: str) -> None:
 
 
 async def send_booking_notifications(booking) -> None:
-    """Notify the trainer and confirm to the client that a booking came in."""
-    when = booking.start_time.strftime("%A, %d %B %Y at %I:%M %p")
+    """Notify the trainer and confirm to the client that a booking came in.
+
+    `booking.start_time` is nullable (see Booking.start_time) — the public
+    booking form no longer collects a preferred date/time at all, so this
+    almost always fires with no time yet; the coach picks the real slot
+    from the dashboard, which is what send_schedule_confirmation below is
+    for.
+    """
+    when = (
+        booking.start_time.strftime("%A, %d %B %Y at %I:%M %p")
+        if booking.start_time
+        else "a time to be confirmed"
+    )
 
     trainer_html = _wrap(
         "New booking request",
@@ -89,7 +124,25 @@ async def send_booking_notifications(booking) -> None:
 
     client_html = _wrap(
         "We've got your request!",
-        f"<p style='color:#ccc;line-height:1.6'>Hi {booking.name}, thanks for booking your "
-        f"<b>{booking.service}</b> for <b>{when}</b>. Your trainer will confirm shortly.</p>",
+        f"<p style='color:#ccc;line-height:1.6'>Hi {booking.name}, thanks for requesting your "
+        f"<b>{booking.service}</b>. We'll reach out shortly to lock in {when} on the calendar.</p>",
     )
-    await send_email(booking.email, "Your Peak Physique booking", client_html)
+    await send_email(booking.email, "Your Peak Physique booking request", client_html)
+
+
+async def send_schedule_confirmation(booking) -> None:
+    """Tells the client their session now has a confirmed time.
+
+    The counterpart to send_booking_notifications above, but for a booking
+    that already existed and just moved from "awaiting scheduling" to a
+    real slot (see Booking.start_time) — the normal path now that every
+    public booking starts with no time and the coach assigns one from the
+    dashboard's Bookings page.
+    """
+    when = booking.start_time.strftime("%A, %d %B %Y at %I:%M %p")
+    html = _wrap(
+        "Your session is confirmed",
+        f"<p style='color:#ccc;line-height:1.6'>Hi {booking.name}, your <b>{booking.service}</b> "
+        f"is confirmed for <b>{when}</b>. We'll see you then!</p>",
+    )
+    await send_email(booking.email, "Your Peak Physique session is confirmed", html)

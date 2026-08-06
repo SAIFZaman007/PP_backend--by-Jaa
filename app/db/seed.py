@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import select
 
 from app.core.config import settings
+from app.core.rbac import MODULES
 from app.core.security import hash_password, verify_password
 from app.db.session import AsyncSessionLocal
 from app.models.booking import Booking, BookingStatus
@@ -15,6 +16,7 @@ from app.models.content import Service, SiteContent, Testimonial
 from app.models.payment import Payment, PaymentStatus, PaymentType
 from app.models.plan import BillingInterval, Plan
 from app.models.progress import ProgressEntry
+from app.models.role_permission import RolePermission
 from app.models.user import User, UserRole
 
 logger = logging.getLogger("peak.seed")
@@ -234,6 +236,34 @@ async def _seed_content(db) -> None:
             logger.info("Seeded site_content section: %s", key)
 
 
+async def _seed_role_permissions(db) -> None:
+    """Seeds one role_permissions row per module for the Trainer role, using
+    each module's default_trainer_access from app/core/rbac.py — Payments
+    and Site Content start closed, everything else starts open, matching
+    the client's explicit request. Idempotent: only fills in rows that
+    don't exist yet, so re-running this never clobbers an Admin's later
+    changes made from the Role Matrix page.
+    """
+    existing = await db.scalars(
+        select(RolePermission.module_key).where(RolePermission.role == UserRole.trainer)
+    )
+    existing_keys = set(existing)
+    created = 0
+    for module in MODULES:
+        if module.key in existing_keys:
+            continue
+        db.add(
+            RolePermission(
+                role=UserRole.trainer,
+                module_key=module.key,
+                can_access=module.default_trainer_access,
+            )
+        )
+        created += 1
+    if created:
+        logger.info("Seeded %d default Role Matrix permission(s) for Trainer", created)
+
+
 async def _seed_staff(db) -> None:
     trainer = await db.scalar(
         select(User).where(User.email == str(settings.FIRST_TRAINER_EMAIL).lower())
@@ -421,6 +451,7 @@ async def seed() -> None:
         else:
             await _seed_demo_clients(db)
         await _seed_content(db)
+        await _seed_role_permissions(db)
         await db.commit()
     logger.info("Seed complete.")
     _print_credentials_summary()

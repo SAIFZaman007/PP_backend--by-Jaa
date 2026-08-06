@@ -38,6 +38,12 @@ def _get_service():
 
 def create_event(booking) -> str | None:
     """Create a calendar event for a booking; returns the event id or None."""
+    if booking.start_time is None:
+        # Awaiting scheduling — nothing to put on the calendar yet. Once the
+        # coach assigns a real time from the dashboard, bookings.update_booking
+        # calls create_event again via its "newly_scheduled" background task.
+        logger.info("Booking %s has no start_time yet — skipping calendar sync", booking.id)
+        return None
     service = _get_service()
     if service is None:
         logger.info("Google Calendar disabled — skipping event for booking %s", booking.id)

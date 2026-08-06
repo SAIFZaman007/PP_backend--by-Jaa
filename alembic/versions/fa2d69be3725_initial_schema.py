@@ -1,8 +1,8 @@
 """initial_schema
 
-Revision ID: 6721f419f2a8
+Revision ID: fa2d69be3725
 Revises: 
-Create Date: 2026-08-05 21:54:28.133394
+Create Date: 2026-08-06 15:23:27.382369
 """
 from typing import Sequence, Union
 
@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = '6721f419f2a8'
+revision: str = 'fa2d69be3725'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -35,6 +35,18 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_plans_slug'), 'plans', ['slug'], unique=True)
+    op.create_table('role_permissions',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('role', sa.Enum('client', 'trainer', 'admin', name='user_role'), nullable=False),
+    sa.Column('module_key', sa.String(length=40), nullable=False),
+    sa.Column('can_access', sa.Boolean(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('role', 'module_key', name='uq_role_permissions_role_module')
+    )
+    op.create_index(op.f('ix_role_permissions_module_key'), 'role_permissions', ['module_key'], unique=False)
+    op.create_index(op.f('ix_role_permissions_role'), 'role_permissions', ['role'], unique=False)
     op.create_table('services',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('icon', sa.String(length=40), nullable=False),
@@ -94,6 +106,26 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
     op.create_index(op.f('ix_users_role'), 'users', ['role'], unique=False)
+    op.create_table('invitations',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('email', sa.String(length=255), nullable=False),
+    sa.Column('role', sa.Enum('client', 'trainer', 'admin', name='user_role'), nullable=False),
+    sa.Column('token_hash', sa.String(length=64), nullable=False),
+    sa.Column('status', sa.Enum('pending', 'accepted', 'cancelled', 'expired', name='invitation_status'), nullable=False),
+    sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('accepted_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('invited_by_id', sa.Integer(), nullable=True),
+    sa.Column('accepted_by_id', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['accepted_by_id'], ['users.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['invited_by_id'], ['users.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_invitations_email'), 'invitations', ['email'], unique=False)
+    op.create_index(op.f('ix_invitations_invited_by_id'), 'invitations', ['invited_by_id'], unique=False)
+    op.create_index(op.f('ix_invitations_status'), 'invitations', ['status'], unique=False)
+    op.create_index(op.f('ix_invitations_token_hash'), 'invitations', ['token_hash'], unique=True)
     op.create_table('messages',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('sender_id', sa.Integer(), nullable=False),
@@ -208,6 +240,11 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_messages_sender_id'), table_name='messages')
     op.drop_index(op.f('ix_messages_recipient_id'), table_name='messages')
     op.drop_table('messages')
+    op.drop_index(op.f('ix_invitations_token_hash'), table_name='invitations')
+    op.drop_index(op.f('ix_invitations_status'), table_name='invitations')
+    op.drop_index(op.f('ix_invitations_invited_by_id'), table_name='invitations')
+    op.drop_index(op.f('ix_invitations_email'), table_name='invitations')
+    op.drop_table('invitations')
     op.drop_index(op.f('ix_users_role'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_table('users')
@@ -215,6 +252,9 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_site_content_section_key'), table_name='site_content')
     op.drop_table('site_content')
     op.drop_table('services')
+    op.drop_index(op.f('ix_role_permissions_role'), table_name='role_permissions')
+    op.drop_index(op.f('ix_role_permissions_module_key'), table_name='role_permissions')
+    op.drop_table('role_permissions')
     op.drop_index(op.f('ix_plans_slug'), table_name='plans')
     op.drop_table('plans')
     # ### end Alembic commands ###

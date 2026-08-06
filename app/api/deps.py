@@ -5,10 +5,13 @@ from typing import Annotated, Any
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.rbac import DEFAULT_TRAINER_ACCESS
 from app.core.security import decode_token
 from app.db.session import get_session
+from app.models.role_permission import RolePermission
 from app.models.user import User, UserRole
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -86,3 +89,37 @@ def require_roles(
 # Ready-made staff guard (trainer or admin)
 StaffUser = Annotated[User, Depends(require_roles(UserRole.trainer, UserRole.admin))]
 AdminUser = Annotated[User, Depends(require_roles(UserRole.admin))]
+
+
+def require_module(module_key: str) -> Callable[..., Coroutine[Any, Any, User]]:
+    """Dependency factory enforcing Role Matrix access to a dashboard module.
+
+    Admins always pass — there's no admin row in role_permissions to check
+    against, by design (see RolePermission), so the Super Admin account can
+    never lock itself out of its own console. Trainers are checked against
+    their role_permissions row for `module_key`; if no row exists yet
+    (e.g. a module was added after this trainer's rules were last seeded),
+    DEFAULT_TRAINER_ACCESS is the fallback — this is what makes the
+    Payments/Site Content default-deny an actual guarantee rather than
+    something that only holds as long as the seed script ran correctly.
+    """
+
+    async def _guard(user: StaffUser, db: DbSession) -> User:
+        if user.role == UserRole.admin:
+            return user
+        allowed = await db.scalar(
+            select(RolePermission.can_access).where(
+                RolePermission.role == user.role,
+                RolePermission.module_key == module_key,
+            )
+        )
+        if allowed is None:
+            allowed = DEFAULT_TRAINER_ACCESS.get(module_key, False)
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this section. Ask an Admin to grant it in Role Matrix.",
+            )
+        return user
+
+    return _guard

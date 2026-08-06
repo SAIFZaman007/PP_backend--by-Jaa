@@ -11,7 +11,12 @@ class BookingCreate(BaseModel):
     phone: str | None = Field(default=None, max_length=40)
     goal: str | None = Field(default=None, max_length=120)
     service: str = Field(default="Free Intro Call", max_length=120)
-    start_time: datetime
+    # Optional on purpose: the public booking form no longer collects a
+    # client-stated date/time preference (see Booking.jsx) — every call is
+    # scheduled from the coach's own calendar after the request comes in,
+    # the same "awaiting scheduling" flow already used for bookings that
+    # come from a paid checkout (see Booking.start_time / payments.py).
+    start_time: datetime | None = None
     notes: str | None = None
 
 

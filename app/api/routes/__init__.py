@@ -14,6 +14,7 @@ from app.api.routes import (
     payments,
     plans,
     progress,
+    role_matrix,
     uploads,
     users,
 )
@@ -31,3 +32,4 @@ api_router.include_router(progress.router)
 api_router.include_router(payments.router)
 api_router.include_router(messages.router)
 api_router.include_router(admin.router)
+api_router.include_router(role_matrix.router)

@@ -1,11 +1,12 @@
 """Trainer / admin dashboard endpoints — the live view over all client data."""
 from datetime import datetime, timezone
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import AdminUser, DbSession, StaffUser
+from app.api.deps import AdminUser, DbSession, require_module
 from app.models.booking import Booking, BookingStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.progress import ProgressEntry
@@ -15,9 +16,18 @@ from app.schemas.user import AdminUserUpdate, UserPublic
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+# Role Matrix guards for this file's modules — Admins always pass; Trainers
+# are checked against their role_permissions row (see require_module).
+# "overview" and "clients" default to open for trainers; "payments" defaults
+# closed (see app/core/rbac.py) per the client's explicit request to keep
+# financial records Admin-only until granted.
+OverviewAccess = Annotated[User, Depends(require_module("overview"))]
+ClientsAccess = Annotated[User, Depends(require_module("clients"))]
+PaymentsAccess = Annotated[User, Depends(require_module("payments"))]
+
 
 @router.get("/stats")
-async def dashboard_stats(_staff: StaffUser, db: DbSession) -> dict:
+async def dashboard_stats(_staff: OverviewAccess, db: DbSession) -> dict:
     now = datetime.now(timezone.utc)
 
     total_clients = await db.scalar(
@@ -54,7 +64,7 @@ async def dashboard_stats(_staff: StaffUser, db: DbSession) -> dict:
 
 @router.get("/clients", response_model=list[UserPublic])
 async def list_clients(
-    _staff: StaffUser,
+    _staff: ClientsAccess,
     db: DbSession,
     q: str | None = Query(default=None, description="Search name/email"),
 ) -> list[User]:
@@ -70,7 +80,7 @@ async def list_clients(
 
 
 @router.get("/clients/{user_id}")
-async def client_detail(user_id: int, _staff: StaffUser, db: DbSession) -> dict:
+async def client_detail(user_id: int, _staff: ClientsAccess, db: DbSession) -> dict:
     user = await db.get(User, user_id)
     if user is None or user.role != UserRole.client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -110,7 +120,7 @@ async def admin_update_user(
 
 
 @router.get("/payments", response_model=list[PaymentPublic])
-async def all_payments(_staff: StaffUser, db: DbSession) -> list[Payment]:
+async def all_payments(_staff: PaymentsAccess, db: DbSession) -> list[Payment]:
     return list(
         await db.scalars(
             select(Payment)

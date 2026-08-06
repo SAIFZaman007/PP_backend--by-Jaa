@@ -5,6 +5,15 @@ from app.schemas.message import MessageCreate, MessagePublic
 from app.schemas.payment import CheckoutRequest, CheckoutResponse, PaymentPublic
 from app.schemas.plan import PlanPublic
 from app.schemas.progress import ProgressCreate, ProgressPublic
+from app.schemas.role_matrix import (
+    InvitationAccept,
+    InvitationAcceptPreview,
+    InvitationCreate,
+    InvitationPublic,
+    ModuleAccessRow,
+    ModuleAccessUpdate,
+    MyAccess,
+)
 from app.schemas.user import AdminUserUpdate, UserPublic, UserUpdate
 
 __all__ = [
@@ -14,4 +23,6 @@ __all__ = [
     "CheckoutRequest", "CheckoutResponse", "PaymentPublic",
     "PlanPublic", "ProgressCreate", "ProgressPublic",
     "AdminUserUpdate", "UserPublic", "UserUpdate",
+    "InvitationAccept", "InvitationAcceptPreview", "InvitationCreate", "InvitationPublic",
+    "ModuleAccessRow", "ModuleAccessUpdate", "MyAccess",
 ]
