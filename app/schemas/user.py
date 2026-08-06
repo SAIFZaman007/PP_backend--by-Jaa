@@ -21,6 +21,8 @@ class UserPublic(UserBase):
     role: UserRole
     is_active: bool
     created_at: datetime
+    # Only meaningful for role=client — see User.assigned_trainer_id.
+    assigned_trainer_id: int | None = None
 
 
 class UserUpdate(BaseModel):
@@ -35,3 +37,14 @@ class UserUpdate(BaseModel):
 class AdminUserUpdate(UserUpdate):
     role: UserRole | None = None
     is_active: bool | None = None
+    # Set to a Trainer's user id to assign a client, or null to unassign
+    # (falls back to the primary Admin — see users.get_coach).
+    assigned_trainer_id: int | None = None
+
+
+class BulkAssignTrainerRequest(BaseModel):
+    """Body for PATCH /admin/clients/assign-trainer — the Clients list's
+    bulk-assign action. `assigned_trainer_id` of null unassigns every
+    selected client back to the default-coach fallback."""
+    client_ids: list[int] = Field(min_length=1, max_length=500)
+    assigned_trainer_id: int | None = None

@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = "no-reply@trainpeakphysique.com"
     SMTP_FROM_NAME: str = "Peak Physique"
     SMTP_STARTTLS: bool = True
-    TRAINER_NOTIFY_EMAIL: str = "trainer@trainpeakphysique.com"
+    TRAINER_NOTIFY_EMAIL: str = "founder@trainpeakphysique.com"
 
     AI_CHAT_ENABLED: bool = False
     AI_CHAT_PROVIDER: str = "groq"  # "groq" | "anthropic"

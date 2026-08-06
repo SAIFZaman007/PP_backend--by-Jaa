@@ -3,16 +3,17 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import AdminUser, DbSession, require_module
+from app.api.deps import AdminUser, DbSession, ensure_client_visible, require_module
 from app.models.booking import Booking, BookingStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.progress import ProgressEntry
 from app.models.user import User, UserRole
+from app.schemas.common import Ok
 from app.schemas.payment import PaymentPublic
-from app.schemas.user import AdminUserUpdate, UserPublic
+from app.schemas.user import AdminUserUpdate, BulkAssignTrainerRequest, UserPublic
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -69,6 +70,11 @@ async def list_clients(
     q: str | None = Query(default=None, description="Search name/email"),
 ) -> list[User]:
     stmt = select(User).where(User.role == UserRole.client).order_by(User.created_at.desc())
+    # Trainers only ever see clients assigned to them — Admins see
+    # everyone. This is what makes "assigned trainer" a real separation
+    # of duties rather than just a label (see User.assigned_trainer_id).
+    if _staff.role == UserRole.trainer:
+        stmt = stmt.where(User.assigned_trainer_id == _staff.id)
     if q:
         like = f"%{q.lower()}%"
         stmt = stmt.where(
@@ -79,11 +85,38 @@ async def list_clients(
     return list(await db.scalars(stmt))
 
 
+@router.patch("/clients/assign-trainer", response_model=Ok)
+async def bulk_assign_trainer(
+    payload: BulkAssignTrainerRequest, _admin: AdminUser, db: DbSession
+) -> Ok:
+    """Bulk-assign action for the Clients list — sets (or, with a null
+    assigned_trainer_id, clears) the assigned Trainer for every listed
+    client in one transaction. Admin-only: reassigning clients between
+    trainers is a staffing decision, not something a Trainer does to
+    their own roster.
+    """
+    if payload.assigned_trainer_id is not None:
+        trainer = await db.get(User, payload.assigned_trainer_id)
+        if trainer is None or trainer.role != UserRole.trainer or not trainer.is_active:
+            raise HTTPException(
+                status_code=400, detail="assigned_trainer_id must reference an active trainer"
+            )
+
+    await db.execute(
+        update(User)
+        .where(User.id.in_(payload.client_ids), User.role == UserRole.client)
+        .values(assigned_trainer_id=payload.assigned_trainer_id)
+    )
+    await db.commit()
+    return Ok()
+
+
 @router.get("/clients/{user_id}")
 async def client_detail(user_id: int, _staff: ClientsAccess, db: DbSession) -> dict:
     user = await db.get(User, user_id)
     if user is None or user.role != UserRole.client:
         raise HTTPException(status_code=404, detail="Client not found")
+    ensure_client_visible(user, _staff)
 
     bookings_count = await db.scalar(
         select(func.count()).select_from(Booking).where(Booking.client_id == user_id)
@@ -112,7 +145,16 @@ async def admin_update_user(
     user = await db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+
+    update_fields = payload.model_dump(exclude_unset=True)
+    if update_fields.get("assigned_trainer_id") is not None:
+        trainer = await db.get(User, update_fields["assigned_trainer_id"])
+        if trainer is None or trainer.role != UserRole.trainer or not trainer.is_active:
+            raise HTTPException(
+                status_code=400, detail="assigned_trainer_id must reference an active trainer"
+            )
+
+    for field, value in update_fields.items():
         setattr(user, field, value)
     await db.commit()
     await db.refresh(user)

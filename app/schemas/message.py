@@ -36,3 +36,13 @@ class ConversationPublic(BaseModel):
     user: ConversationPartner
     last_message: MessagePublic
     unread_count: int
+
+
+# ── Admin oversight (read-only view across every client<->coach thread) ──
+
+
+class OversightConversation(BaseModel):
+    client: ConversationPartner
+    counterpart: ConversationPartner
+    last_message: MessagePublic
+    unread_count: int

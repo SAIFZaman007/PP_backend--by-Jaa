@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 
-from app.api.deps import CurrentUser, DbSession, require_module
+from app.api.deps import CurrentUser, DbSession, ensure_client_visible, require_module
 from app.models.progress import ProgressEntry
 from app.models.user import User
 from app.schemas.progress import ProgressCreate, ProgressPublic
@@ -50,8 +50,10 @@ async def delete_progress(entry_id: int, user: CurrentUser, db: DbSession) -> No
 @router.get("/user/{user_id}", response_model=list[ProgressPublic])
 async def client_progress(user_id: int, _staff: ClientsAccess, db: DbSession) -> list[ProgressEntry]:
     """Staff view of a specific client's progress (the cross-device sync)."""
-    if await db.get(User, user_id) is None:
+    target = await db.get(User, user_id)
+    if target is None:
         raise HTTPException(status_code=404, detail="User not found")
+    ensure_client_visible(target, _staff)
     rows = await db.scalars(
         select(ProgressEntry)
         .where(ProgressEntry.user_id == user_id)

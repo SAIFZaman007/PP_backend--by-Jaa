@@ -4,7 +4,7 @@ from __future__ import annotations
 import enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Enum, Float, String
+from sqlalchemy import Boolean, Enum, Float, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -45,6 +45,21 @@ class User(Base, TimestampMixin):
 
     # Billing
     stripe_customer_id: Mapped[str | None] = mapped_column(String(120))
+
+    # Only ever meaningful for role=client rows — which Trainer this
+    # client is assigned to, set by an Admin from the dashboard (Clients
+    # list or Client Detail). Drives who the client's "Message Coach"
+    # resolves to (see users.get_coach) and which clients a Trainer sees
+    # in their own Clients list (see admin.list_clients). Left null for
+    # staff rows and for clients nobody's assigned yet — those clients
+    # still fall back to the primary Admin, so nobody is left unreachable.
+    # No SQLAlchemy relationship() is defined for this on purpose: every
+    # place that needs the trainer's name already has (or separately
+    # fetches) the staff roster, so a plain scalar FK avoids any risk of
+    # an unawaited lazy-load in this async codebase.
+    assigned_trainer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
 
     # Relationships
     bookings: Mapped[list[Booking]] = relationship(

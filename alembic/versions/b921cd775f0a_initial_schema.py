@@ -1,8 +1,8 @@
 """initial_schema
 
-Revision ID: fa2d69be3725
+Revision ID: b921cd775f0a
 Revises: 
-Create Date: 2026-08-06 15:23:27.382369
+Create Date: 2026-08-06 17:39:48.837664
 """
 from typing import Sequence, Union
 
@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = 'fa2d69be3725'
+revision: str = 'b921cd775f0a'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -100,10 +100,13 @@ def upgrade() -> None:
     sa.Column('weight_lbs', sa.Float(), nullable=True),
     sa.Column('height', sa.String(length=20), nullable=True),
     sa.Column('stripe_customer_id', sa.String(length=120), nullable=True),
+    sa.Column('assigned_trainer_id', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['assigned_trainer_id'], ['users.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_index(op.f('ix_users_assigned_trainer_id'), 'users', ['assigned_trainer_id'], unique=False)
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
     op.create_index(op.f('ix_users_role'), 'users', ['role'], unique=False)
     op.create_table('invitations',
@@ -247,6 +250,7 @@ def downgrade() -> None:
     op.drop_table('invitations')
     op.drop_index(op.f('ix_users_role'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
+    op.drop_index(op.f('ix_users_assigned_trainer_id'), table_name='users')
     op.drop_table('users')
     op.drop_table('testimonials')
     op.drop_index(op.f('ix_site_content_section_key'), table_name='site_content')

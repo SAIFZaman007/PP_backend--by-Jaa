@@ -123,3 +123,17 @@ def require_module(module_key: str) -> Callable[..., Coroutine[Any, Any, User]]:
         return user
 
     return _guard
+
+
+def ensure_client_visible(client: User, staff: User) -> None:
+    """Ownership guard for per-client staff endpoints.
+
+    Trainers may only view/manage clients assigned to them (see
+    User.assigned_trainer_id); Admins can see every client — this is the
+    read-only-for-everyone-else, visible-to-everyone-for-Admin split the
+    client asked for. Raises the same 404 used when a client simply
+    doesn't exist, so a Trainer probing another Trainer's client ids can't
+    distinguish "not assigned to me" from "doesn't exist".
+    """
+    if staff.role == UserRole.trainer and client.assigned_trainer_id != staff.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")

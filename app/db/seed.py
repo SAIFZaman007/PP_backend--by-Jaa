@@ -201,6 +201,11 @@ DEMO_CLIENTS = [
         "first_name": "Alex", "last_name": "Rivera", "goal": "Build Muscle",
         "weight_lbs": 185, "height": "5'11\"", "phone": "(555) 201-4433",
         "seed_history": True,
+        # Demonstrates the assigned-trainer feature out of the box: Alex's
+        # "Message Coach" resolves straight to Jordan (see users.get_coach)
+        # instead of falling back to the admin, and Jordan's own Clients
+        # list (see admin.list_clients) shows Alex from day one.
+        "assigned_trainer_email": "coach@trainpeakphysique.com",
     },
     {
         "email": "priya@peakphysique.com", "password": "peak2025",
@@ -338,6 +343,16 @@ async def _seed_demo_clients(db) -> None:
         if existing is not None:
             continue
 
+        assigned_trainer_id = None
+        if c.get("assigned_trainer_email"):
+            # Autoflushes any pending EXTRA_STAFF insert from _seed_staff
+            # (same session, not yet committed — see seed()), so this sees
+            # the trainer's real id even on a completely fresh database.
+            trainer = await db.scalar(
+                select(User).where(User.email == c["assigned_trainer_email"])
+            )
+            assigned_trainer_id = trainer.id if trainer else None
+
         client = User(
             email=c["email"],
             hashed_password=hash_password(c["password"]),
@@ -348,6 +363,7 @@ async def _seed_demo_clients(db) -> None:
             weight_lbs=c["weight_lbs"],
             height=c["height"],
             phone=c["phone"],
+            assigned_trainer_id=assigned_trainer_id,
         )
         db.add(client)
         await db.flush()  # get client.id
@@ -442,6 +458,12 @@ async def seed() -> None:
     async with AsyncSessionLocal() as db:
         await _seed_plans(db)
         await _seed_staff(db)
+        # AsyncSessionLocal is autoflush=False (see app/db/session.py), so
+        # without this explicit flush _seed_demo_clients' lookup of
+        # EXTRA_STAFF's trainer (for assigned_trainer_email) wouldn't see
+        # it yet on a completely fresh database — it'd still be a pending,
+        # unflushed insert with no real id assigned.
+        await db.flush()
         # Demo clients (fixed "peak2025" password, fabricated progress
         # history) exist to make a fresh dev/staging install immediately
         # explorable. Skipped in production — a live client-facing DB
