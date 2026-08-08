@@ -9,6 +9,7 @@ from app.api.routes import (
     auth,
     bookings,
     chat,
+    coaching,
     content,
     messages,
     payments,
@@ -33,3 +34,4 @@ api_router.include_router(payments.router)
 api_router.include_router(messages.router)
 api_router.include_router(admin.router)
 api_router.include_router(role_matrix.router)
+api_router.include_router(coaching.router)

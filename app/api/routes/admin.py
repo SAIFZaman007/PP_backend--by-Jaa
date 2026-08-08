@@ -8,9 +8,12 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import AdminUser, DbSession, ensure_client_visible, require_module
 from app.models.booking import Booking, BookingStatus
+from app.models.client_note import ClientNote
+from app.models.nutrition_plan import NutritionPlan
 from app.models.payment import Payment, PaymentStatus
 from app.models.progress import ProgressEntry
 from app.models.user import User, UserRole
+from app.models.workout_plan import WorkoutPlan
 from app.schemas.common import Ok
 from app.schemas.payment import PaymentPublic
 from app.schemas.user import AdminUserUpdate, BulkAssignTrainerRequest, UserPublic
@@ -49,18 +52,50 @@ async def dashboard_stats(_staff: OverviewAccess, db: DbSession) -> dict:
         .select_from(Booking)
         .where(Booking.start_time >= now, Booking.status != BookingStatus.cancelled)
     )
-    revenue_cents = await db.scalar(
-        select(func.coalesce(func.sum(Payment.amount_cents), 0)).where(
-            Payment.status == PaymentStatus.succeeded
-        )
-    )
-    return {
+
+    stats: dict = {
         "total_clients": total_clients or 0,
         "active_clients": active_clients or 0,
         "pending_bookings": pending_bookings or 0,
         "upcoming_bookings": upcoming_bookings or 0,
-        "revenue_cents": revenue_cents or 0,
     }
+
+    # Revenue is a company financial record, not a coaching metric — it's
+    # computed here only for Admins, full stop. This is intentionally NOT
+    # gated by the Role Matrix's "overview" module like the rest of this
+    # endpoint: there's no toggle that can hand a Trainer visibility into
+    # how much money the company is making (see app/core/rbac.py).
+    if _staff.role == UserRole.admin:
+        revenue_cents = await db.scalar(
+            select(func.coalesce(func.sum(Payment.amount_cents), 0)).where(
+                Payment.status == PaymentStatus.succeeded
+            )
+        )
+        stats["revenue_cents"] = revenue_cents or 0
+    else:
+        # In place of revenue, a Trainer's dashboard home page surfaces a
+        # snapshot of their own coaching workspace instead — the Notes /
+        # Nutrition / Workout tools that replaced the revenue widget (see
+        # app/api/routes/coaching.py and dashboard/src/pages/ClientDetail.jsx).
+        # Scoped to their assigned roster, same as their Clients list.
+        own_clients = select(User.id).where(User.assigned_trainer_id == _staff.id)
+        stats["notes_count"] = await db.scalar(
+            select(func.count())
+            .select_from(ClientNote)
+            .where(ClientNote.client_id.in_(own_clients))
+        ) or 0
+        stats["nutrition_plans_count"] = await db.scalar(
+            select(func.count())
+            .select_from(NutritionPlan)
+            .where(NutritionPlan.client_id.in_(own_clients))
+        ) or 0
+        stats["workout_plans_count"] = await db.scalar(
+            select(func.count())
+            .select_from(WorkoutPlan)
+            .where(WorkoutPlan.client_id.in_(own_clients))
+        ) or 0
+
+    return stats
 
 
 @router.get("/clients", response_model=list[UserPublic])

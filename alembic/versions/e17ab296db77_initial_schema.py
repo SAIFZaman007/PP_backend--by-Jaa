@@ -1,8 +1,8 @@
 """initial_schema
 
-Revision ID: b921cd775f0a
+Revision ID: e17ab296db77
 Revises: 
-Create Date: 2026-08-06 17:39:48.837664
+Create Date: 2026-08-08 12:48:57.123126
 """
 from typing import Sequence, Union
 
@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = 'b921cd775f0a'
+revision: str = 'e17ab296db77'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -109,6 +109,19 @@ def upgrade() -> None:
     op.create_index(op.f('ix_users_assigned_trainer_id'), 'users', ['assigned_trainer_id'], unique=False)
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
     op.create_index(op.f('ix_users_role'), 'users', ['role'], unique=False)
+    op.create_table('client_notes',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('client_id', sa.Integer(), nullable=False),
+    sa.Column('trainer_id', sa.Integer(), nullable=True),
+    sa.Column('content', sa.Text(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['client_id'], ['users.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['trainer_id'], ['users.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_client_notes_client_id'), 'client_notes', ['client_id'], unique=False)
+    op.create_index(op.f('ix_client_notes_trainer_id'), 'client_notes', ['trainer_id'], unique=False)
     op.create_table('invitations',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('email', sa.String(length=255), nullable=False),
@@ -143,6 +156,24 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_messages_recipient_id'), 'messages', ['recipient_id'], unique=False)
     op.create_index(op.f('ix_messages_sender_id'), 'messages', ['sender_id'], unique=False)
+    op.create_table('nutrition_plans',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('client_id', sa.Integer(), nullable=False),
+    sa.Column('trainer_id', sa.Integer(), nullable=True),
+    sa.Column('title', sa.String(length=120), nullable=False),
+    sa.Column('content', sa.Text(), nullable=False),
+    sa.Column('calories_target', sa.Integer(), nullable=True),
+    sa.Column('protein_target_g', sa.Integer(), nullable=True),
+    sa.Column('carbs_target_g', sa.Integer(), nullable=True),
+    sa.Column('fat_target_g', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['client_id'], ['users.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['trainer_id'], ['users.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_nutrition_plans_client_id'), 'nutrition_plans', ['client_id'], unique=False)
+    op.create_index(op.f('ix_nutrition_plans_trainer_id'), 'nutrition_plans', ['trainer_id'], unique=False)
     op.create_table('payments',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=True),
@@ -176,6 +207,20 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_progress_entries_entry_date'), 'progress_entries', ['entry_date'], unique=False)
     op.create_index(op.f('ix_progress_entries_user_id'), 'progress_entries', ['user_id'], unique=False)
+    op.create_table('workout_plans',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('client_id', sa.Integer(), nullable=False),
+    sa.Column('trainer_id', sa.Integer(), nullable=True),
+    sa.Column('title', sa.String(length=120), nullable=False),
+    sa.Column('content', sa.Text(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['client_id'], ['users.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['trainer_id'], ['users.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_workout_plans_client_id'), 'workout_plans', ['client_id'], unique=False)
+    op.create_index(op.f('ix_workout_plans_trainer_id'), 'workout_plans', ['trainer_id'], unique=False)
     op.create_table('payment_items',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('payment_id', sa.Integer(), nullable=False),
@@ -233,6 +278,9 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_payment_items_plan_id'), table_name='payment_items')
     op.drop_index(op.f('ix_payment_items_payment_id'), table_name='payment_items')
     op.drop_table('payment_items')
+    op.drop_index(op.f('ix_workout_plans_trainer_id'), table_name='workout_plans')
+    op.drop_index(op.f('ix_workout_plans_client_id'), table_name='workout_plans')
+    op.drop_table('workout_plans')
     op.drop_index(op.f('ix_progress_entries_user_id'), table_name='progress_entries')
     op.drop_index(op.f('ix_progress_entries_entry_date'), table_name='progress_entries')
     op.drop_table('progress_entries')
@@ -240,6 +288,9 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_payments_stripe_session_id'), table_name='payments')
     op.drop_index(op.f('ix_payments_status'), table_name='payments')
     op.drop_table('payments')
+    op.drop_index(op.f('ix_nutrition_plans_trainer_id'), table_name='nutrition_plans')
+    op.drop_index(op.f('ix_nutrition_plans_client_id'), table_name='nutrition_plans')
+    op.drop_table('nutrition_plans')
     op.drop_index(op.f('ix_messages_sender_id'), table_name='messages')
     op.drop_index(op.f('ix_messages_recipient_id'), table_name='messages')
     op.drop_table('messages')
@@ -248,6 +299,9 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_invitations_invited_by_id'), table_name='invitations')
     op.drop_index(op.f('ix_invitations_email'), table_name='invitations')
     op.drop_table('invitations')
+    op.drop_index(op.f('ix_client_notes_trainer_id'), table_name='client_notes')
+    op.drop_index(op.f('ix_client_notes_client_id'), table_name='client_notes')
+    op.drop_table('client_notes')
     op.drop_index(op.f('ix_users_role'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_index(op.f('ix_users_assigned_trainer_id'), table_name='users')

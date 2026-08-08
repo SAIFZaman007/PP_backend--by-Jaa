@@ -11,9 +11,12 @@ from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.booking import Booking
+    from app.models.client_note import ClientNote
     from app.models.message import Message
+    from app.models.nutrition_plan import NutritionPlan
     from app.models.payment import Payment
     from app.models.progress import ProgressEntry
+    from app.models.workout_plan import WorkoutPlan
 
 
 class UserRole(str, enum.Enum):
@@ -74,6 +77,25 @@ class User(Base, TimestampMixin):
     sent_messages: Mapped[list[Message]] = relationship(
         back_populates="sender",
         foreign_keys="Message.sender_id",
+        cascade="all, delete-orphan",
+    )
+    # Coaching workspace (Notes / Nutrition / Workouts) — only ever
+    # meaningful for role=client rows, mirroring progress_entries above.
+    # Deleting a client cascades to their coaching records; deleting the
+    # Trainer who wrote them does not (see ClientNote.trainer_id etc.).
+    client_notes: Mapped[list[ClientNote]] = relationship(
+        back_populates="client",
+        foreign_keys="ClientNote.client_id",
+        cascade="all, delete-orphan",
+    )
+    nutrition_plans: Mapped[list[NutritionPlan]] = relationship(
+        back_populates="client",
+        foreign_keys="NutritionPlan.client_id",
+        cascade="all, delete-orphan",
+    )
+    workout_plans: Mapped[list[WorkoutPlan]] = relationship(
+        back_populates="client",
+        foreign_keys="WorkoutPlan.client_id",
         cascade="all, delete-orphan",
     )
 
