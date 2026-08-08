@@ -19,11 +19,4 @@ COPY . .
 
 EXPOSE 8000
 
-# Apply schema migrations, seed reference data, then start the API
-# (gunicorn-style workers via uvicorn). Uses `alembic upgrade head` rather
-# than the dev-only create_all path (app/db/init_db.py) — that only ever
-# creates tables that don't exist yet, so it silently no-ops on an
-# existing production database instead of applying schema changes like
-# the bookings.start_time / payment_item_id migration. Both steps are
-# idempotent and safe to re-run on every deploy/restart.
-CMD ["sh", "-c", "alembic upgrade head && python -m app.db.seed && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
