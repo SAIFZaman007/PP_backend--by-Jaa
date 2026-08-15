@@ -29,19 +29,16 @@ def _get_service():
 
         creds = None
         if settings.GOOGLE_SERVICE_ACCOUNT_JSON:
-            try:
-                info = json.loads(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-                creds = service_account.Credentials.from_service_account_info(
-                    info,
-                    scopes=["https://www.googleapis.com/auth/calendar"],
-                )
-            except Exception:
+            raw = settings.GOOGLE_SERVICE_ACCOUNT_JSON.strip()
+            if raw.startswith("{"):
+                info = json.loads(raw)
+            else:
                 import base64
-                info = json.loads(base64.b64decode(settings.GOOGLE_SERVICE_ACCOUNT_JSON).decode("utf-8"))
-                creds = service_account.Credentials.from_service_account_info(
-                    info,
-                    scopes=["https://www.googleapis.com/auth/calendar"],
-                )
+                info = json.loads(base64.b64decode(raw).decode("utf-8"))
+            creds = service_account.Credentials.from_service_account_info(
+                info,
+                scopes=["https://www.googleapis.com/auth/calendar"],
+            )
         elif os.path.exists(settings.GOOGLE_SERVICE_ACCOUNT_FILE):
             creds = service_account.Credentials.from_service_account_file(
                 settings.GOOGLE_SERVICE_ACCOUNT_FILE,
