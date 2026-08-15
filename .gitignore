@@ -13,6 +13,8 @@ venv/
 !.env.example
 *.pem
 *.key
+google-service-account.json
+*service-account*.json
 
 # DB / local
 *.db

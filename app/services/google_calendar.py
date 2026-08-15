@@ -22,13 +22,36 @@ def _get_service():
     if not settings.GOOGLE_CALENDAR_ENABLED:
         return None
     try:
+        import json
+        import os
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
 
-        creds = service_account.Credentials.from_service_account_file(
-            settings.GOOGLE_SERVICE_ACCOUNT_FILE,
-            scopes=["https://www.googleapis.com/auth/calendar"],
-        )
+        creds = None
+        if settings.GOOGLE_SERVICE_ACCOUNT_JSON:
+            try:
+                info = json.loads(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
+                creds = service_account.Credentials.from_service_account_info(
+                    info,
+                    scopes=["https://www.googleapis.com/auth/calendar"],
+                )
+            except Exception:
+                import base64
+                info = json.loads(base64.b64decode(settings.GOOGLE_SERVICE_ACCOUNT_JSON).decode("utf-8"))
+                creds = service_account.Credentials.from_service_account_info(
+                    info,
+                    scopes=["https://www.googleapis.com/auth/calendar"],
+                )
+        elif os.path.exists(settings.GOOGLE_SERVICE_ACCOUNT_FILE):
+            creds = service_account.Credentials.from_service_account_file(
+                settings.GOOGLE_SERVICE_ACCOUNT_FILE,
+                scopes=["https://www.googleapis.com/auth/calendar"],
+            )
+
+        if not creds:
+            logger.error("No valid Google Service Account credentials found.")
+            return None
+
         _service = build("calendar", "v3", credentials=creds, cache_discovery=False)
         return _service
     except Exception as exc:

@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     # Google Calendar
     GOOGLE_CALENDAR_ENABLED: bool = False
     GOOGLE_SERVICE_ACCOUNT_FILE: str = "./google-service-account.json"
+    GOOGLE_SERVICE_ACCOUNT_JSON: str = ""
     GOOGLE_CALENDAR_ID: str = "primary"
 
     # --- Media / admin image uploads ---------------------------------------
