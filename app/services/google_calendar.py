@@ -52,15 +52,26 @@ def create_event(booking) -> str | None:
         end = booking.start_time + timedelta(minutes=45)
         event = {
             "summary": f"{booking.service} — {booking.name}",
-            "description": f"Goal: {booking.goal or 'n/a'}\nPhone: {booking.phone or 'n/a'}\n"
-            f"Email: {booking.email}",
+            "description": (
+                f"Client: {booking.name}\n"
+                f"Email: {booking.email}\n"
+                f"Phone: {booking.phone or 'n/a'}\n"
+                f"Goal: {booking.goal or 'n/a'}"
+            ),
             "start": {"dateTime": booking.start_time.isoformat()},
             "end": {"dateTime": end.isoformat()},
-            "attendees": [{"email": booking.email}],
+            # NOTE: Service accounts cannot invite attendees without
+            # Domain-Wide Delegation of Authority (DWD). Attendees are
+            # intentionally omitted here to avoid a 403 error. The client
+            # is notified separately via the SMTP email service.
         }
         created = (
             service.events()
-            .insert(calendarId=settings.GOOGLE_CALENDAR_ID, body=event, sendUpdates="all")
+            .insert(
+                calendarId=settings.GOOGLE_CALENDAR_ID,
+                body=event,
+                sendUpdates="none",
+            )
             .execute()
         )
         return created.get("id")
@@ -75,7 +86,9 @@ def delete_event(event_id: str) -> None:
         return
     try:
         service.events().delete(
-            calendarId=settings.GOOGLE_CALENDAR_ID, eventId=event_id
+            calendarId=settings.GOOGLE_CALENDAR_ID,
+            eventId=event_id,
+            sendUpdates="all",
         ).execute()
     except Exception as exc:
         logger.error("Failed deleting calendar event %s: %s", event_id, exc)

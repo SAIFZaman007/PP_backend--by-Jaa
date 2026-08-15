@@ -11,7 +11,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenPair
 from app.schemas.user import UserPublic
 from app.services.email import send_welcome_email
@@ -43,6 +43,7 @@ async def register(
         first_name=payload.first_name,
         last_name=payload.last_name,
         goal=payload.goal,
+        is_approved=False,
     )
     db.add(user)
     await db.commit()
@@ -61,6 +62,11 @@ async def login(request: Request, payload: LoginRequest, db: DbSession) -> Token
         )
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
+    if user.role == UserRole.client and not user.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is pending administrator approval. Please check back once an admin approves your account.",
+        )
     return _tokens(user)
 
 
@@ -71,7 +77,7 @@ async def refresh(payload: RefreshRequest, db: DbSession) -> TokenPair:
         user = await db.get(User, int(data["sub"]))
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-    if not user or not user.is_active:
+    if not user or not user.is_active or (user.role == UserRole.client and not user.is_approved):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
     return _tokens(user)
 

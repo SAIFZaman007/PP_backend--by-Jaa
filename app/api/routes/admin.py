@@ -7,6 +7,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import AdminUser, DbSession, ensure_client_visible, require_module
+from app.core.security import hash_password
 from app.models.booking import Booking, BookingStatus
 from app.models.client_note import ClientNote
 from app.models.nutrition_plan import NutritionPlan
@@ -16,7 +17,12 @@ from app.models.user import User, UserRole
 from app.models.workout_plan import WorkoutPlan
 from app.schemas.common import Ok
 from app.schemas.payment import PaymentPublic
-from app.schemas.user import AdminUserUpdate, BulkAssignTrainerRequest, UserPublic
+from app.schemas.user import (
+    AdminClientCreate,
+    AdminUserUpdate,
+    BulkAssignTrainerRequest,
+    UserPublic,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -53,9 +59,16 @@ async def dashboard_stats(_staff: OverviewAccess, db: DbSession) -> dict:
         .where(Booking.start_time >= now, Booking.status != BookingStatus.cancelled)
     )
 
+    pending_approvals = await db.scalar(
+        select(func.count())
+        .select_from(User)
+        .where(User.role == UserRole.client, User.is_approved.is_(False))
+    )
+
     stats: dict = {
         "total_clients": total_clients or 0,
         "active_clients": active_clients or 0,
+        "pending_approvals": pending_approvals or 0,
         "pending_bookings": pending_bookings or 0,
         "upcoming_bookings": upcoming_bookings or 0,
     }
@@ -103,6 +116,9 @@ async def list_clients(
     _staff: ClientsAccess,
     db: DbSession,
     q: str | None = Query(default=None, description="Search name/email"),
+    approval_status: str | None = Query(
+        default=None, description="Filter by approval status: pending, approved, or all"
+    ),
 ) -> list[User]:
     stmt = select(User).where(User.role == UserRole.client).order_by(User.created_at.desc())
     # Trainers only ever see clients assigned to them — Admins see
@@ -110,6 +126,10 @@ async def list_clients(
     # of duties rather than just a label (see User.assigned_trainer_id).
     if _staff.role == UserRole.trainer:
         stmt = stmt.where(User.assigned_trainer_id == _staff.id)
+    if approval_status == "pending":
+        stmt = stmt.where(User.is_approved.is_(False))
+    elif approval_status == "approved":
+        stmt = stmt.where(User.is_approved.is_(True))
     if q:
         like = f"%{q.lower()}%"
         stmt = stmt.where(
@@ -191,6 +211,71 @@ async def admin_update_user(
 
     for field, value in update_fields.items():
         setattr(user, field, value)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+@router.post("/clients", response_model=UserPublic, status_code=201)
+async def admin_create_client(
+    payload: AdminClientCreate, _admin: AdminUser, db: DbSession
+) -> User:
+    """Admin creates a new client account directly with pre-approved status."""
+    existing = await db.scalar(select(User).where(User.email == payload.email.lower()))
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="An account with this email already exists",
+        )
+    if payload.assigned_trainer_id is not None:
+        trainer = await db.get(User, payload.assigned_trainer_id)
+        if trainer is None or trainer.role != UserRole.trainer or not trainer.is_active:
+            raise HTTPException(
+                status_code=400, detail="assigned_trainer_id must reference an active trainer"
+            )
+    user = User(
+        email=payload.email.lower(),
+        hashed_password=hash_password(payload.password),
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        phone=payload.phone,
+        goal=payload.goal,
+        weight_lbs=payload.weight_lbs,
+        height=payload.height,
+        role=UserRole.client,
+        is_active=True,
+        is_approved=True,
+        assigned_trainer_id=payload.assigned_trainer_id,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+@router.delete("/clients/{client_id}", response_model=Ok)
+async def admin_delete_client(client_id: int, _admin: AdminUser, db: DbSession) -> Ok:
+    """Admin permanently deletes a client account and cascades their coaching data."""
+    user = await db.get(User, client_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if user.role != UserRole.client:
+        raise HTTPException(
+            status_code=400, detail="Only client accounts can be deleted via this endpoint"
+        )
+    await db.delete(user)
+    await db.commit()
+    return Ok()
+
+
+@router.patch("/clients/{client_id}/approve", response_model=UserPublic)
+async def admin_approve_client(client_id: int, _admin: AdminUser, db: DbSession) -> User:
+    """Admin approves a pending client account for portal access."""
+    user = await db.get(User, client_id)
+    if user is None or user.role != UserRole.client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    user.is_approved = True
+    user.is_active = True
     await db.commit()
     await db.refresh(user)
     return user

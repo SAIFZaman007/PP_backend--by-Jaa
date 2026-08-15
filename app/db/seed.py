@@ -284,6 +284,8 @@ async def _seed_staff(db) -> None:
             first_name=first_name,
             last_name=last_name,
             role=UserRole.admin,
+            is_active=True,
+            is_approved=True,
         ))
         logger.info("Seeded Head Coach / Super Admin: %s", settings.FIRST_TRAINER_EMAIL)
     else:
@@ -307,6 +309,9 @@ async def _seed_staff(db) -> None:
         if not trainer.is_active:
             trainer.is_active = True
             changed = True
+        if not trainer.is_approved:
+            trainer.is_approved = True
+            changed = True
         if changed:
             db.add(trainer)
             logger.info("Reconciled Head Coach / Super Admin: %s (.env values applied)",
@@ -328,6 +333,8 @@ async def _seed_staff(db) -> None:
                 first_name=staff["first_name"],
                 last_name=staff["last_name"],
                 role=staff["role"],
+                is_active=True,
+                is_approved=True,
             ))
             logger.info("Seeded staff account: %s (%s)", staff["email"], staff["role"].value)
         elif not verify_password(staff["password"], existing.hashed_password):
@@ -359,6 +366,8 @@ async def _seed_demo_clients(db) -> None:
             first_name=c["first_name"],
             last_name=c["last_name"],
             role=UserRole.client,
+            is_active=True,
+            is_approved=True,
             goal=c["goal"],
             weight_lbs=c["weight_lbs"],
             height=c["height"],
@@ -430,7 +439,7 @@ def _print_credentials_summary() -> None:
     ]
     if weak_admin_password:
         lines.append(
-            "    \u26a0  FIRST_TRAINER_PASSWORD is short — use a longer,"
+            "    [!] FIRST_TRAINER_PASSWORD is short -- use a longer,"
             " unique password in .env before deploying."
         )
     lines.append("")
@@ -444,14 +453,17 @@ def _print_credentials_summary() -> None:
         lines.append("")
 
     if DEMO_CLIENTS and not settings.is_production:
-        lines.append("  Demo clients  (client portal — /login)")
+        lines.append("  Demo clients  (client portal -- /login)")
         for c in DEMO_CLIENTS:
             lines.append(f"    {c['email']}  /  {c['password']}")
         lines.append("")
 
     lines.append("=" * 62)
     lines.append("")
-    print("\n".join(lines))
+    try:
+        print("\n".join(lines))
+    except Exception:
+        pass
 
 
 async def seed() -> None:

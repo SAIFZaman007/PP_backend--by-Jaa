@@ -40,6 +40,9 @@ class User(Base, TimestampMixin):
         Enum(UserRole, name="user_role"), default=UserRole.client, nullable=False, index=True
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_approved: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
 
     # Fitness profile
     goal: Mapped[str | None] = mapped_column(String(120))
